@@ -1,34 +1,51 @@
-from flask import Flask
+
 import os
-from datetime import datetime
+import threading
+from flask import Flask
+from bale import Bot, Message
 
 app = Flask(__name__)
 
+TOKEN = os.getenv("BALE_TOKEN")
+
+bot = Bot(token=TOKEN)
+
+@bot.event
+async def on_before_ready():
+    await bot.delete_webhook()
+
+@bot.event
+async def on_ready():
+    print("HOOSH WEB YAR IS ONLINE!")
+
+@bot.event
+async def on_message(message: Message):
+    text = (message.content or "").strip()
+
+    if text == "/start":
+        await message.reply(
+            "سلام 👋\n"
+            "خیلی به هوش وب یار خوش اومدید! 🌹\n\n"
+            "اتصال ربات با موفقیت برقرار شد 💙"
+        )
+
 @app.route("/")
 def home():
-    return """
-    <html>
-    <head>
-        <meta charset="UTF-8">
-        <title>HUSHWEB TEST</title>
-    </head>
-    <body style="background:#101827;color:white;text-align:center;padding:60px;font-family:Arial">
-        <h1>🚀 HUSHWEB TEST</h1>
-        <h2>Render is ONLINE!</h2>
-        <p>ربات هوش وب یار آماده میزبانی است 💙</p>
-        <p>وضعیت: فعال ✅</p>
-    </body>
-    </html>
-    """
+    return "HOOSH WEB YAR - ONLINE"
 
 @app.route("/health")
 def health():
-    return {
-        "status": "online",
-        "project": "HUSHWEB TEST",
-        "time": datetime.now().isoformat()
-    }
+    return {"status": "online"}
 
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+def start_bot():
+    if TOKEN:
+        bot.run()
+    else:
+        print("ERROR: BALE_TOKEN NOT FOUND")
+
+if TOKEN:
+    threading.Thread(
+        target=start_bot,
+        daemon=True
+    ).start()
+
