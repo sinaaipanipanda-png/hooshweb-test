@@ -1,4 +1,3 @@
-
 import os
 import io
 import json
@@ -21,6 +20,9 @@ from bale import (
 TOKEN = os.getenv("BALE_TOKEN", "").strip()
 ADMIN_ID = 696006270
 
+CLASS_LINK = "https://meet35312345.adobeconnect.com/hooshweb130/"
+GROUP_LINK = "https://ble.ir/join/6JopirnSXz"
+
 DB_PATH = "hooshwebyar.db"
 DATA_DIR = "data"
 FILES_DIR = os.path.join(DATA_DIR, "files")
@@ -39,7 +41,6 @@ STUDENTS = {
 }
 
 states = {}
-
 app = Flask(__name__)
 
 # =====================================
@@ -138,24 +139,6 @@ def student_name(uid):
     return row["name"] if row else STUDENTS.get(uid, f"کاربر {uid}")
 
 
-def get_setting(key):
-    with connect() as con:
-        row = con.execute(
-            "SELECT value FROM settings WHERE key=?",
-            (key,)
-        ).fetchone()
-
-    return row["value"] if row else ""
-
-
-def save_setting(key, value):
-    with connect() as con:
-        con.execute(
-            "INSERT OR REPLACE INTO settings(key,value) VALUES(?,?)",
-            (key, value)
-        )
-
-
 def user_id(message):
     return int(message.author.user_id)
 
@@ -188,7 +171,7 @@ def admin_menu():
     return keyboard([
         ["مدیریت تکالیف 📝", "ثبت کارنامه 📸"],
         ["ثبت نمره ✍️", "ثبت مثبت/منفی 〽️"],
-        ["ثبت حضور و غیاب 😇", "تنظیم لینک‌ها 🔗"],
+        ["ثبت حضور و غیاب 😇"],
         ["پیام‌های پشتیبانی 📞"],
         ["دریافت فایل بکاپ 📥", "بارگزاری فایل بکاپ 📤"],
         ["فهرست دانش‌آموزان 👥"],
@@ -428,11 +411,9 @@ async def on_message(message: Message):
 
     state = states.get(uid)
 
-    # ---------------------------------
     # شروع
-    # ---------------------------------
-
     if text in ["/start", "شروع"]:
+        states.pop(uid, None)
         await reply(message, "*در حال بارگزاری اطلاعات...*\n*کمی صبر کنید..🌹*")
         await reply(
             message,
@@ -443,10 +424,7 @@ async def on_message(message: Message):
         )
         return
 
-    # ---------------------------------
     # پنل مدیر
-    # ---------------------------------
-
     if uid == ADMIN_ID and text in ["/admin", "پنل مدیریت"]:
         states.pop(uid, None)
         await reply(message, "🛠 پنل مدیریت هوش وب یار", admin_menu())
@@ -462,10 +440,7 @@ async def on_message(message: Message):
         await reply(message, "عملیات لغو شد.", admin_menu() if uid == ADMIN_ID else main_menu())
         return
 
-    # ---------------------------------
-    # ادامه عملیات‌های چندمرحله‌ای
-    # ---------------------------------
-
+    # عملیات چندمرحله‌ای
     if state:
 
         action = state["action"]
@@ -649,26 +624,17 @@ async def on_message(message: Message):
             await reply(message, "پیام شما برای پشتیبانی ارسال شد. 💙", main_menu())
             return
 
-        if action == "class_link":
-            save_setting("class_link", text)
-            states.pop(uid, None)
-            await reply(message, "لینک کلاس ذخیره شد.", admin_menu())
-            return
-
-        if action == "group_link":
-            save_setting("group_link", text)
-            states.pop(uid, None)
-            await reply(message, "لینک گروه ذخیره شد.", admin_menu())
-            return
-
         if action == "restore":
             path = await save_file(message, "backup")
 
-            if not path or not path.lower().endswith(".zip"):
+            if not path:
                 await reply(message, "فایل ZIP بکاپ را ارسال کنید.")
                 return
 
             try:
+                if not zipfile.is_zipfile(path):
+                    raise ValueError("فایل ارسالی ZIP معتبر نیست.")
+
                 restore_backup(path)
                 init_db()
                 states.pop(uid, None)
@@ -711,10 +677,7 @@ async def on_message(message: Message):
                 await reply(message, "قالب پاسخ: شماره پیام سپس متن پاسخ")
             return
 
-    # ---------------------------------
     # امکانات مدیر
-    # ---------------------------------
-
     if uid == ADMIN_ID:
 
         if text == "مدیریت تکالیف 📝":
@@ -736,30 +699,6 @@ async def on_message(message: Message):
 
         if text == "ثبت حضور و غیاب 😇":
             await ask_student(message, "attendance")
-            return
-
-        if text == "تنظیم لینک‌ها 🔗":
-            await reply(
-                message,
-                "برای تنظیم لینک بنویسید:\n"
-                "لینک کلاس\n"
-                "یا\n"
-                "لینک گروه"
-            )
-            states[uid] = {"action": "choose_link"}
-            return
-
-        if state and state["action"] == "choose_link":
-            return
-
-        if text == "لینک کلاس":
-            states[uid] = {"action": "class_link"}
-            await reply(message, "لینک کلاس را ارسال کنید:")
-            return
-
-        if text == "لینک گروه":
-            states[uid] = {"action": "group_link"}
-            await reply(message, "لینک گروه را ارسال کنید:")
             return
 
         if text == "دریافت فایل بکاپ 📥":
@@ -812,10 +751,7 @@ async def on_message(message: Message):
             states[uid] = {"action": "support_reply"}
             return
 
-    # ---------------------------------
     # منوی دانش‌آموز
-    # ---------------------------------
-
     if text == "تکالیف جاری 📝":
         await show_homework(uid)
         return
@@ -826,11 +762,11 @@ async def on_message(message: Message):
         return
 
     if text == "لینک کلاس آنلاین 🧑‍💻":
-        await reply(message, get_setting("class_link") or "لینک کلاس هنوز ثبت نشده است.")
+        await reply(message, "🧑‍💻 لینک کلاس آنلاین:\n" + CLASS_LINK)
         return
 
     if text == "لینک گروه 😁":
-        await reply(message, get_setting("group_link") or "لینک گروه هنوز ثبت نشده است.")
+        await reply(message, "😁 لینک گروه هوش وب یار:\n" + GROUP_LINK)
         return
 
     if text == "کارنامه 💘":
